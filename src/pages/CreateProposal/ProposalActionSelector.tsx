@@ -3,10 +3,10 @@ import { ButtonDropdown } from 'components/Button'
 import Column from 'components/Column'
 import Modal from 'components/Modal'
 import { RowBetween } from 'components/Row'
-import { MenuItem, PaddedColumn, Separator } from 'components/SearchModal/styleds'
+import { MenuItem, PaddedColumn, Separator } from 'components/SearchModal/styled'
 import React, { useCallback } from 'react'
 import { Text } from 'rebass'
-import styled from 'styled-components/macro'
+import styled from 'styled-components'
 import { CloseIcon } from 'theme'
 
 export enum ProposalAction {
@@ -28,13 +28,13 @@ const ContentWrapper = styled(Column)`
 const ActionSelectorHeader = styled.div`
   font-size: 14px;
   font-weight: 500;
-  color: ${({ theme }) => theme.deprecated_text2};
+  color: ${({ theme }) => theme.textSecondary};
 `
 
 const ActionDropdown = styled(ButtonDropdown)`
   padding: 0px;
   background-color: transparent;
-  color: ${({ theme }) => theme.deprecated_text1};
+  color: ${({ theme }) => theme.textPrimary};
   font-size: 1.25rem;
 
   :hover,
@@ -51,7 +51,7 @@ const ProposalActionSelectorFlex = styled.div`
   display: flex;
   flex-flow: column nowrap;
   border-radius: 20px;
-  border: 1px solid ${({ theme }) => theme.deprecated_bg2};
+  border: 1px solid ${({ theme }) => theme.backgroundInteractive};
   background-color: ${({ theme }) => theme.deprecated_bg1};
 `
 

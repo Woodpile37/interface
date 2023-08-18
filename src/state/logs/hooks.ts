@@ -1,4 +1,4 @@
-import { Filter } from '@ethersproject/providers'
+import type { Filter } from '@ethersproject/providers'
 import { useWeb3React } from '@web3-react/core'
 import useBlockNumber from 'lib/hooks/useBlockNumber'
 import { useEffect, useMemo } from 'react'
@@ -7,7 +7,7 @@ import { useAppDispatch, useAppSelector } from '../hooks'
 import { addListener, removeListener } from './slice'
 import { filterToKey, isHistoricalLog, Log } from './utils'
 
-export enum LogsState {
+enum LogsState {
   // The filter is invalid
   INVALID,
   // The logs are being loaded
@@ -20,8 +20,8 @@ export enum LogsState {
   SYNCED,
 }
 
-export interface UseLogsResult {
-  logs: Log[] | undefined
+interface UseLogsResult {
+  logs?: Log[]
   state: LogsState
 }
 

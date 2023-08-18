@@ -1,128 +1,211 @@
-import { Trans } from '@lingui/macro'
-import { Currency, Percent, TradeType } from '@uniswap/sdk-core'
-import { ElementName, EventName } from 'components/AmplitudeAnalytics/constants'
-import { Event } from 'components/AmplitudeAnalytics/constants'
-import { TraceEvent } from 'components/AmplitudeAnalytics/TraceEvent'
-import {
-  formatPercentInBasisPointsNumber,
-  getDurationTillTimestampSinceEpoch,
-  getNumberFormattedToDecimalPlace,
-} from 'components/AmplitudeAnalytics/utils'
-import { useStablecoinValue } from 'hooks/useStablecoinPrice'
+import { Plural, Trans } from '@lingui/macro'
+import { BrowserEvent, InterfaceElementName, SwapEventName } from '@uniswap/analytics-events'
+import { Percent, TradeType } from '@uniswap/sdk-core'
+import { useWeb3React } from '@web3-react/core'
+import { TraceEvent } from 'analytics'
+import Column from 'components/Column'
+import { MouseoverTooltip, TooltipSize } from 'components/Tooltip'
+import { SwapResult } from 'hooks/useSwapCallback'
 import useTransactionDeadline from 'hooks/useTransactionDeadline'
+import useNativeCurrency from 'lib/hooks/useNativeCurrency'
 import { ReactNode } from 'react'
-import { Text } from 'rebass'
-import { InterfaceTrade } from 'state/routing/types'
-import { useClientSideRouter, useUserSlippageTolerance } from 'state/user/hooks'
-import { computeRealizedLPFeePercent } from 'utils/prices'
+import { AlertTriangle } from 'react-feather'
+import { InterfaceTrade, RouterPreference } from 'state/routing/types'
+import { getTransactionCount, isClassicTrade } from 'state/routing/utils'
+import { useRouterPreference, useUserSlippageTolerance } from 'state/user/hooks'
+import styled, { useTheme } from 'styled-components'
+import { ThemedText } from 'theme'
+import { formatNumber, formatPriceImpact, NumberType } from 'utils/formatNumbers'
+import { formatTransactionAmount, priceToPreciseFloat } from 'utils/formatNumbers'
+import getRoutingDiagramEntries from 'utils/getRoutingDiagramEntries'
+import { formatSwapButtonClickEventProperties } from 'utils/loggingFormatters'
+import { getPriceImpactWarning } from 'utils/prices'
 
-import { ButtonError } from '../Button'
-import { AutoRow } from '../Row'
-import { getPriceImpactPercent } from './AdvancedSwapDetails'
-import { SwapCallbackError } from './styleds'
+import { ButtonError, SmallButtonPrimary } from '../Button'
+import Row, { AutoRow, RowBetween, RowFixed } from '../Row'
+import { GasBreakdownTooltip } from './GasBreakdownTooltip'
+import { SwapCallbackError, SwapShowAcceptChanges } from './styled'
+import { Label } from './SwapModalHeaderAmount'
 
-interface AnalyticsEventProps {
-  trade: InterfaceTrade<Currency, Currency, TradeType>
-  txHash: string | undefined
-  allowedSlippage: Percent
-  transactionDeadlineSecondsSinceEpoch: number | undefined
-  isAutoSlippage: boolean
-  isAutoRouterApi: boolean
-  tokenInAmountUsd: string | undefined
-  tokenOutAmountUsd: string | undefined
-  lpFeePercent: Percent
-}
+const DetailsContainer = styled(Column)`
+  padding: 0 8px;
+`
 
-const formatAnalyticsEventProperties = ({
-  trade,
-  txHash,
-  allowedSlippage,
-  transactionDeadlineSecondsSinceEpoch,
-  isAutoSlippage,
-  isAutoRouterApi,
-  tokenInAmountUsd,
-  tokenOutAmountUsd,
-  lpFeePercent,
-}: AnalyticsEventProps) => ({
-  estimated_network_fee_usd: trade.gasUseEstimateUSD
-    ? getNumberFormattedToDecimalPlace(trade.gasUseEstimateUSD, 2)
-    : undefined,
-  transaction_hash: txHash,
-  transaction_deadline_seconds: getDurationTillTimestampSinceEpoch(transactionDeadlineSecondsSinceEpoch),
-  token_in_amount_usd: tokenInAmountUsd ? parseFloat(tokenInAmountUsd) : undefined,
-  token_out_amount_usd: tokenOutAmountUsd ? parseFloat(tokenOutAmountUsd) : undefined,
-  token_in_address: trade.inputAmount.currency.isToken ? trade.inputAmount.currency.address : undefined,
-  token_out_address: trade.outputAmount.currency.isToken ? trade.outputAmount.currency.address : undefined,
-  token_in_symbol: trade.inputAmount.currency.symbol,
-  token_out_symbol: trade.outputAmount.currency.symbol,
-  token_in_amount: getNumberFormattedToDecimalPlace(trade.inputAmount, trade.inputAmount.currency.decimals),
-  token_out_amount: getNumberFormattedToDecimalPlace(trade.outputAmount, trade.outputAmount.currency.decimals),
-  price_impact_basis_points: formatPercentInBasisPointsNumber(getPriceImpactPercent(lpFeePercent, trade)),
-  allowed_slippage_basis_points: formatPercentInBasisPointsNumber(allowedSlippage),
-  is_auto_router_api: isAutoRouterApi,
-  is_auto_slippage: isAutoSlippage,
-  chain_id:
-    trade.inputAmount.currency.chainId === trade.outputAmount.currency.chainId
-      ? trade.inputAmount.currency.chainId
-      : undefined,
-  // TODO(lynnshaoyu): implement duration_from_first_quote_to_swap_submission_seconds
-})
+const StyledAlertTriangle = styled(AlertTriangle)`
+  margin-right: 8px;
+  min-width: 24px;
+`
+
+const ConfirmButton = styled(ButtonError)`
+  height: 56px;
+  margin-top: 10px;
+`
+
+const DetailRowValue = styled(ThemedText.BodySmall)`
+  text-align: right;
+  overflow-wrap: break-word;
+`
 
 export default function SwapModalFooter({
   trade,
   allowedSlippage,
-  txHash,
+  swapResult,
   onConfirm,
   swapErrorMessage,
   disabledConfirm,
+  fiatValueInput,
+  fiatValueOutput,
+  showAcceptChanges,
+  onAcceptChanges,
 }: {
-  trade: InterfaceTrade<Currency, Currency, TradeType>
-  txHash: string | undefined
+  trade: InterfaceTrade
+  swapResult?: SwapResult
   allowedSlippage: Percent
   onConfirm: () => void
-  swapErrorMessage: ReactNode | undefined
+  swapErrorMessage?: ReactNode
   disabledConfirm: boolean
+  fiatValueInput: { data?: number; isLoading: boolean }
+  fiatValueOutput: { data?: number; isLoading: boolean }
+  showAcceptChanges: boolean
+  onAcceptChanges: () => void
 }) {
   const transactionDeadlineSecondsSinceEpoch = useTransactionDeadline()?.toNumber() // in seconds since epoch
-  const isAutoSlippage = useUserSlippageTolerance() === 'auto'
-  const [clientSideRouter] = useClientSideRouter()
-  const tokenInAmountUsd = useStablecoinValue(trade.inputAmount)?.toFixed(2)
-  const tokenOutAmountUsd = useStablecoinValue(trade.outputAmount)?.toFixed(2)
-  const lpFeePercent = computeRealizedLPFeePercent(trade)
+  const isAutoSlippage = useUserSlippageTolerance()[0] === 'auto'
+  const [routerPreference] = useRouterPreference()
+  const routes = isClassicTrade(trade) ? getRoutingDiagramEntries(trade) : undefined
+  const theme = useTheme()
+  const { chainId } = useWeb3React()
+  const nativeCurrency = useNativeCurrency(chainId)
+
+  const label = `${trade.executionPrice.baseCurrency?.symbol} `
+  const labelInverted = `${trade.executionPrice.quoteCurrency?.symbol}`
+  const formattedPrice = formatTransactionAmount(priceToPreciseFloat(trade.executionPrice))
+  const txCount = getTransactionCount(trade)
 
   return (
     <>
-      <AutoRow>
-        <TraceEvent
-          events={[Event.onClick]}
-          element={ElementName.CONFIRM_SWAP_BUTTON}
-          name={EventName.SWAP_SUBMITTED}
-          properties={formatAnalyticsEventProperties({
-            trade,
-            txHash,
-            allowedSlippage,
-            transactionDeadlineSecondsSinceEpoch,
-            isAutoSlippage,
-            isAutoRouterApi: !clientSideRouter,
-            tokenInAmountUsd,
-            tokenOutAmountUsd,
-            lpFeePercent,
-          })}
-        >
-          <ButtonError
-            onClick={onConfirm}
-            disabled={disabledConfirm}
-            style={{ margin: '10px 0 0 0' }}
-            id={ElementName.CONFIRM_SWAP_BUTTON}
+      <DetailsContainer gap="md">
+        <ThemedText.BodySmall>
+          <Row align="flex-start" justify="space-between" gap="sm">
+            <Label>
+              <Trans>Exchange rate</Trans>
+            </Label>
+            <DetailRowValue>{`1 ${labelInverted} = ${formattedPrice ?? '-'} ${label}`}</DetailRowValue>
+          </Row>
+        </ThemedText.BodySmall>
+        <ThemedText.BodySmall>
+          <Row align="flex-start" justify="space-between" gap="sm">
+            <MouseoverTooltip
+              text={
+                <Trans>
+                  The fee paid to miners who process your transaction. This must be paid in ${nativeCurrency.symbol}.
+                </Trans>
+              }
+            >
+              <Label cursor="help">
+                <Plural value={txCount} one="Network fee" other="Network fees" />
+              </Label>
+            </MouseoverTooltip>
+            <MouseoverTooltip placement="right" size={TooltipSize.Small} text={<GasBreakdownTooltip trade={trade} />}>
+              <DetailRowValue>{formatNumber(trade.totalGasUseEstimateUSD, NumberType.FiatGasPrice)}</DetailRowValue>
+            </MouseoverTooltip>
+          </Row>
+        </ThemedText.BodySmall>
+        {isClassicTrade(trade) && (
+          <ThemedText.BodySmall>
+            <Row align="flex-start" justify="space-between" gap="sm">
+              <MouseoverTooltip text={<Trans>The impact your trade has on the market price of this pool.</Trans>}>
+                <Label cursor="help">
+                  <Trans>Price impact</Trans>
+                </Label>
+              </MouseoverTooltip>
+              <DetailRowValue color={getPriceImpactWarning(trade.priceImpact)}>
+                {trade.priceImpact ? formatPriceImpact(trade.priceImpact) : '-'}
+              </DetailRowValue>
+            </Row>
+          </ThemedText.BodySmall>
+        )}
+        <ThemedText.BodySmall>
+          <Row align="flex-start" justify="space-between" gap="sm">
+            <MouseoverTooltip
+              text={
+                trade.tradeType === TradeType.EXACT_INPUT ? (
+                  <Trans>
+                    The minimum amount you are guaranteed to receive. If the price slips any further, your transaction
+                    will revert.
+                  </Trans>
+                ) : (
+                  <Trans>
+                    The maximum amount you are guaranteed to spend. If the price slips any further, your transaction
+                    will revert.
+                  </Trans>
+                )
+              }
+            >
+              <Label cursor="help">
+                {trade.tradeType === TradeType.EXACT_INPUT ? (
+                  <Trans>Minimum received</Trans>
+                ) : (
+                  <Trans>Maximum sent</Trans>
+                )}
+              </Label>
+            </MouseoverTooltip>
+            <DetailRowValue>
+              {trade.tradeType === TradeType.EXACT_INPUT
+                ? `${trade.minimumAmountOut(allowedSlippage).toSignificant(6)} ${trade.outputAmount.currency.symbol}`
+                : `${trade.maximumAmountIn(allowedSlippage).toSignificant(6)} ${trade.inputAmount.currency.symbol}`}
+            </DetailRowValue>
+          </Row>
+        </ThemedText.BodySmall>
+      </DetailsContainer>
+      {showAcceptChanges ? (
+        <SwapShowAcceptChanges data-testid="show-accept-changes">
+          <RowBetween>
+            <RowFixed>
+              <StyledAlertTriangle size={20} />
+              <ThemedText.DeprecatedMain color={theme.accentAction}>
+                <Trans>Price updated</Trans>
+              </ThemedText.DeprecatedMain>
+            </RowFixed>
+            <SmallButtonPrimary onClick={onAcceptChanges}>
+              <Trans>Accept</Trans>
+            </SmallButtonPrimary>
+          </RowBetween>
+        </SwapShowAcceptChanges>
+      ) : (
+        <AutoRow>
+          <TraceEvent
+            events={[BrowserEvent.onClick]}
+            element={InterfaceElementName.CONFIRM_SWAP_BUTTON}
+            name={SwapEventName.SWAP_SUBMITTED_BUTTON_CLICKED}
+            properties={formatSwapButtonClickEventProperties({
+              trade,
+              swapResult,
+              allowedSlippage,
+              transactionDeadlineSecondsSinceEpoch,
+              isAutoSlippage,
+              isAutoRouterApi: routerPreference === RouterPreference.API,
+              routes,
+              fiatValueInput: fiatValueInput.data,
+              fiatValueOutput: fiatValueOutput.data,
+            })}
           >
-            <Text fontSize={20} fontWeight={500}>
-              <Trans>Confirm Swap</Trans>
-            </Text>
-          </ButtonError>
-        </TraceEvent>
+            <ConfirmButton
+              data-testid="confirm-swap-button"
+              onClick={onConfirm}
+              disabled={disabledConfirm}
+              $borderRadius="12px"
+              id={InterfaceElementName.CONFIRM_SWAP_BUTTON}
+            >
+              <ThemedText.HeadlineSmall color="accentTextLightPrimary">
+                <Trans>Confirm swap</Trans>
+              </ThemedText.HeadlineSmall>
+            </ConfirmButton>
+          </TraceEvent>
 
-        {swapErrorMessage ? <SwapCallbackError error={swapErrorMessage} /> : null}
-      </AutoRow>
+          {swapErrorMessage ? <SwapCallbackError error={swapErrorMessage} /> : null}
+        </AutoRow>
+      )}
     </>
   )
 }
