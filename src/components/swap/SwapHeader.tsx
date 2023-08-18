@@ -1,30 +1,46 @@
 import { Trans } from '@lingui/macro'
 import { Percent } from '@uniswap/sdk-core'
-import styled from 'styled-components/macro'
+import { useFiatOnRampButtonEnabled } from 'featureFlags/flags/fiatOnRampButton'
+import { InterfaceTrade } from 'state/routing/types'
+import styled from 'styled-components'
+import { ThemedText } from 'theme'
 
-import { ThemedText } from '../../theme'
 import { RowBetween, RowFixed } from '../Row'
 import SettingsTab from '../Settings'
+import SwapBuyFiatButton from './SwapBuyFiatButton'
 
-const StyledSwapHeader = styled.div`
-  padding: 1rem 1.25rem 0.5rem 1.25rem;
-  width: 100%;
-  color: ${({ theme }) => theme.deprecated_text2};
+const StyledSwapHeader = styled(RowBetween)`
+  margin-bottom: 10px;
+  color: ${({ theme }) => theme.textSecondary};
 `
 
-export default function SwapHeader({ allowedSlippage }: { allowedSlippage: Percent }) {
+const HeaderButtonContainer = styled(RowFixed)`
+  padding: 0 12px;
+  gap: 16px;
+`
+
+export default function SwapHeader({
+  autoSlippage,
+  chainId,
+  trade,
+}: {
+  autoSlippage: Percent
+  chainId?: number
+  trade?: InterfaceTrade
+}) {
+  const fiatOnRampButtonEnabled = useFiatOnRampButtonEnabled()
+
   return (
     <StyledSwapHeader>
-      <RowBetween>
-        <RowFixed>
-          <ThemedText.DeprecatedBlack fontWeight={500} fontSize={16} style={{ marginRight: '8px' }}>
-            <Trans>Swap</Trans>
-          </ThemedText.DeprecatedBlack>
-        </RowFixed>
-        <RowFixed>
-          <SettingsTab placeholderSlippage={allowedSlippage} />
-        </RowFixed>
-      </RowBetween>
+      <HeaderButtonContainer>
+        <ThemedText.SubHeader>
+          <Trans>Swap</Trans>
+        </ThemedText.SubHeader>
+        {fiatOnRampButtonEnabled && <SwapBuyFiatButton />}
+      </HeaderButtonContainer>
+      <RowFixed>
+        <SettingsTab autoSlippage={autoSlippage} chainId={chainId} trade={trade} />
+      </RowFixed>
     </StyledSwapHeader>
   )
 }
