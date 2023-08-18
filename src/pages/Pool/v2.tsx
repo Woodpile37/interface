@@ -1,15 +1,16 @@
 import { Trans } from '@lingui/macro'
+import { InterfacePageName } from '@uniswap/analytics-events'
 import { Pair } from '@uniswap/v2-sdk'
 import { useWeb3React } from '@web3-react/core'
-import { PageName } from 'components/AmplitudeAnalytics/constants'
-import { Trace } from 'components/AmplitudeAnalytics/Trace'
-import { UNSUPPORTED_V2POOL_CHAIN_IDS } from 'constants/chains'
+import { Trace } from 'analytics'
+import { V2Unsupported } from 'components/V2Unsupported'
+import { useNetworkSupportsV2 } from 'hooks/useNetworkSupportsV2'
 import JSBI from 'jsbi'
-import { useContext, useMemo } from 'react'
+import { useMemo } from 'react'
 import { ChevronsRight } from 'react-feather'
 import { Link } from 'react-router-dom'
 import { Text } from 'rebass'
-import styled, { ThemeContext } from 'styled-components/macro'
+import styled, { useTheme } from 'styled-components'
 
 import { ButtonOutlined, ButtonPrimary, ButtonSecondary } from '../../components/Button'
 import Card from '../../components/Card'
@@ -17,7 +18,7 @@ import { AutoColumn } from '../../components/Column'
 import { CardBGImage, CardNoise, CardSection, DataCard } from '../../components/earn/styled'
 import FullPositionCard from '../../components/PositionCard'
 import { RowBetween, RowFixed } from '../../components/Row'
-import { Dots } from '../../components/swap/styleds'
+import { Dots } from '../../components/swap/styled'
 import { SwitchLocaleLink } from '../../components/SwitchLocaleLink'
 import { BIG_INT_ZERO } from '../../constants/misc'
 import { useV2Pairs } from '../../hooks/useV2Pairs'
@@ -29,15 +30,20 @@ import { ExternalLink, HideSmall, ThemedText } from '../../theme'
 const PageWrapper = styled(AutoColumn)`
   max-width: 640px;
   width: 100%;
+
+  ${({ theme }) => theme.deprecated_mediaWidth.deprecated_upToSmall`
+    padding: 0px 8px;
+  `};
 `
 
-const VoteCard = styled(DataCard)`
+const LPFeeExplainer = styled(DataCard)`
   background: radial-gradient(76.02% 75.41% at 1.84% 0%, #27ae60 0%, #000000 100%);
+  margin: 0 0 16px 0;
   overflow: hidden;
 `
 
 const TitleRow = styled(RowBetween)`
-  ${({ theme }) => theme.mediaWidth.upToSmall`
+  ${({ theme }) => theme.deprecated_mediaWidth.deprecated_upToSmall`
     flex-wrap: wrap;
     gap: 12px;
     width: 100%;
@@ -47,7 +53,7 @@ const TitleRow = styled(RowBetween)`
 
 const ButtonRow = styled(RowFixed)`
   gap: 8px;
-  ${({ theme }) => theme.mediaWidth.upToSmall`
+  ${({ theme }) => theme.deprecated_mediaWidth.deprecated_upToSmall`
     width: 100%;
     flex-direction: row-reverse;
     justify-content: space-between;
@@ -55,16 +61,18 @@ const ButtonRow = styled(RowFixed)`
 `
 
 const ResponsiveButtonPrimary = styled(ButtonPrimary)`
+  height: 40px;
   width: fit-content;
   border-radius: 12px;
-  ${({ theme }) => theme.mediaWidth.upToSmall`
+  ${({ theme }) => theme.deprecated_mediaWidth.deprecated_upToSmall`
     width: 48%;
   `};
 `
 
 const ResponsiveButtonSecondary = styled(ButtonSecondary)`
+  height: 40px;
   width: fit-content;
-  ${({ theme }) => theme.mediaWidth.upToSmall`
+  ${({ theme }) => theme.deprecated_mediaWidth.deprecated_upToSmall`
     width: 48%;
   `};
 `
@@ -79,18 +87,14 @@ const EmptyProposals = styled.div`
   align-items: center;
 `
 
-const Layer2Prompt = styled(EmptyProposals)`
-  margin-top: 16px;
-`
-
 export default function Pool() {
-  const theme = useContext(ThemeContext)
-  const { account, chainId } = useWeb3React()
-  const unsupportedV2Network = chainId && UNSUPPORTED_V2POOL_CHAIN_IDS.includes(chainId)
+  const theme = useTheme()
+  const { account } = useWeb3React()
+  const networkSupportsV2 = useNetworkSupportsV2()
 
   // fetch the user's balances of all tracked V2 LP tokens
   let trackedTokenPairs = useTrackedTokenPairs()
-  if (unsupportedV2Network) trackedTokenPairs = []
+  if (!networkSupportsV2) trackedTokenPairs = []
   const tokenPairsWithLiquidityTokens = useMemo(
     () => trackedTokenPairs.map((tokens) => ({ liquidityToken: toV2LiquidityToken(tokens), tokens })),
     [trackedTokenPairs]
@@ -136,10 +140,10 @@ export default function Pool() {
   })
 
   return (
-    <Trace page={PageName.POOL_PAGE} shouldLogImpression>
+    <Trace page={InterfacePageName.POOL_PAGE} shouldLogImpression>
       <>
         <PageWrapper>
-          <VoteCard>
+          <LPFeeExplainer>
             <CardBGImage />
             <CardNoise />
             <CardSection>
@@ -158,9 +162,9 @@ export default function Pool() {
                   </ThemedText.DeprecatedWhite>
                 </RowBetween>
                 <ExternalLink
-                  style={{ color: theme.deprecated_white, textDecoration: 'underline' }}
+                  style={{ color: theme.white, textDecoration: 'underline' }}
                   target="_blank"
-                  href="https://docs.uniswap.org/protocol/V2/concepts/core-concepts/pools"
+                  href="https://docs.uniswap.org/contracts/v2/concepts/core-concepts/pools"
                 >
                   <ThemedText.DeprecatedWhite fontSize={14}>
                     <Trans>Read more about providing liquidity</Trans>
@@ -170,22 +174,14 @@ export default function Pool() {
             </CardSection>
             <CardBGImage />
             <CardNoise />
-          </VoteCard>
+          </LPFeeExplainer>
 
-          {unsupportedV2Network ? (
-            <AutoColumn gap="lg" justify="center">
-              <AutoColumn gap="md" style={{ width: '100%' }}>
-                <Layer2Prompt>
-                  <ThemedText.DeprecatedBody color={theme.deprecated_text3} textAlign="center">
-                    <Trans>V2 Pool is not available on Layer 2. Switch to Layer 1 Ethereum.</Trans>
-                  </ThemedText.DeprecatedBody>
-                </Layer2Prompt>
-              </AutoColumn>
-            </AutoColumn>
+          {!networkSupportsV2 ? (
+            <V2Unsupported />
           ) : (
             <AutoColumn gap="lg" justify="center">
               <AutoColumn gap="md" style={{ width: '100%' }}>
-                <TitleRow style={{ marginTop: '1rem' }} padding={'0'}>
+                <TitleRow style={{ marginTop: '1rem' }} padding="0">
                   <HideSmall>
                     <ThemedText.DeprecatedMediumHeader style={{ marginTop: '0.5rem', justifySelf: 'flex-start' }}>
                       <Trans>Your V2 liquidity</Trans>
@@ -195,7 +191,7 @@ export default function Pool() {
                     <ResponsiveButtonSecondary as={Link} padding="6px 8px" to="/add/v2/ETH">
                       <Trans>Create a pair</Trans>
                     </ResponsiveButtonSecondary>
-                    <ResponsiveButtonPrimary id="find-pool-button" as={Link} to="/pool/v2/find" padding="6px 8px">
+                    <ResponsiveButtonPrimary id="find-pool-button" as={Link} to="/pools/v2/find" padding="6px 8px">
                       <Text fontWeight={500} fontSize={16}>
                         <Trans>Import Pool</Trans>
                       </Text>
@@ -210,13 +206,13 @@ export default function Pool() {
 
                 {!account ? (
                   <Card padding="40px">
-                    <ThemedText.DeprecatedBody color={theme.deprecated_text3} textAlign="center">
+                    <ThemedText.DeprecatedBody color={theme.textTertiary} textAlign="center">
                       <Trans>Connect to a wallet to view your liquidity.</Trans>
                     </ThemedText.DeprecatedBody>
                   </Card>
                 ) : v2IsLoading ? (
                   <EmptyProposals>
-                    <ThemedText.DeprecatedBody color={theme.deprecated_text3} textAlign="center">
+                    <ThemedText.DeprecatedBody color={theme.textTertiary} textAlign="center">
                       <Dots>
                         <Trans>Loading</Trans>
                       </Dots>
@@ -267,7 +263,7 @@ export default function Pool() {
                   </>
                 ) : (
                   <EmptyProposals>
-                    <ThemedText.DeprecatedBody color={theme.deprecated_text3} textAlign="center">
+                    <ThemedText.DeprecatedBody color={theme.textTertiary} textAlign="center">
                       <Trans>No liquidity found.</Trans>
                     </ThemedText.DeprecatedBody>
                   </EmptyProposals>
