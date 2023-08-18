@@ -1,30 +1,28 @@
-import { ALL_SUPPORTED_CHAIN_IDS, SupportedChainId } from './chains'
+import { ChainId } from '@uniswap/sdk-core'
 
-describe('chains', () => {
-  describe('ALL_SUPPORTED_CHAIN_IDS', () => {
-    it('contains all the values in the SupportedChainId enum', () => {
-      Object.values(SupportedChainId).forEach((chainId) => {
-        if (typeof chainId === 'number') expect(ALL_SUPPORTED_CHAIN_IDS.includes(chainId as number)).toBeTruthy()
-      })
-    })
+import { getChainPriority } from './chains'
 
-    it('contains no duplicates', () => {
-      const set = new Set<number>()
-      ALL_SUPPORTED_CHAIN_IDS.forEach((chainId) => {
-        expect(set.has(chainId)).toEqual(false)
-        set.add(chainId)
-      })
-    })
+// Define an array of test cases with chainId and expected priority
+const chainPriorityTestCases: [ChainId, number][] = [
+  [ChainId.MAINNET, 0],
+  [ChainId.GOERLI, 0],
+  [ChainId.SEPOLIA, 0],
+  [ChainId.POLYGON, 1],
+  [ChainId.POLYGON_MUMBAI, 1],
+  [ChainId.ARBITRUM_ONE, 2],
+  [ChainId.ARBITRUM_GOERLI, 2],
+  [ChainId.OPTIMISM, 3],
+  [ChainId.OPTIMISM_GOERLI, 3],
+  [ChainId.BNB, 4],
+  [ChainId.AVALANCHE, 5],
+  [ChainId.CELO, 6],
+  [ChainId.CELO_ALFAJORES, 6],
+]
 
-    it('all values are in the SupportedChainId mapping', () => {
-      ALL_SUPPORTED_CHAIN_IDS.forEach((chainId) => {
-        // takes advantage of the reverse mapping
-        expect(SupportedChainId[chainId]).toBeTruthy()
-      })
-    })
-
-    it('all values are numeric', () => {
-      expect(ALL_SUPPORTED_CHAIN_IDS.every((chainId) => typeof chainId === 'number')).toBeTruthy()
-    })
-  })
-})
+test.each(chainPriorityTestCases)(
+  'getChainPriority returns expected priority for a given ChainId %O',
+  (chainId: ChainId, expectedPriority: number) => {
+    const priority = getChainPriority(chainId)
+    expect(priority).toBe(expectedPriority)
+  }
+)
