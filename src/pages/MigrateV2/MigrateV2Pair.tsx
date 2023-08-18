@@ -1,23 +1,24 @@
 import { Contract } from '@ethersproject/contracts'
-import { TransactionResponse } from '@ethersproject/providers'
+import type { TransactionResponse } from '@ethersproject/providers'
 import { Trans } from '@lingui/macro'
-import { CurrencyAmount, Fraction, Percent, Price, Token } from '@uniswap/sdk-core'
+import { CurrencyAmount, Fraction, Percent, Price, Token, V2_FACTORY_ADDRESSES } from '@uniswap/sdk-core'
 import { FeeAmount, Pool, Position, priceToClosestTick, TickMath } from '@uniswap/v3-sdk'
 import { useWeb3React } from '@web3-react/core'
 import { sendEvent } from 'components/analytics'
 import Badge, { BadgeVariant } from 'components/Badge'
 import { ButtonConfirmed } from 'components/Button'
-import { BlueCard, DarkGreyCard, LightCard, YellowCard } from 'components/Card'
+import { BlueCard, DarkGrayCard, LightCard, YellowCard } from 'components/Card'
 import DoubleCurrencyLogo from 'components/DoubleLogo'
 import FeeSelector from 'components/FeeSelector'
 import RangeSelector from 'components/RangeSelector'
 import RateToggle from 'components/RateToggle'
 import SettingsTab from 'components/Settings'
-import { Dots } from 'components/swap/styleds'
+import { Dots } from 'components/swap/styled'
+import { V2Unsupported } from 'components/V2Unsupported'
 import { ApprovalState, useApproveCallback } from 'hooks/useApproveCallback'
 import useCurrentBlockTimestamp from 'hooks/useCurrentBlockTimestamp'
+import { useNetworkSupportsV2 } from 'hooks/useNetworkSupportsV2'
 import { PoolState, usePool } from 'hooks/usePools'
-import useTheme from 'hooks/useTheme'
 import useTransactionDeadline from 'hooks/useTransactionDeadline'
 import { useV2LiquidityTokenPermit } from 'hooks/useV2LiquidityTokenPermit'
 import JSBI from 'jsbi'
@@ -31,14 +32,14 @@ import { Bound, resetMintState } from 'state/mint/v3/actions'
 import { useRangeHopCallbacks, useV3DerivedMintInfo, useV3MintActionHandlers } from 'state/mint/v3/hooks'
 import { useIsTransactionPending, useTransactionAdder } from 'state/transactions/hooks'
 import { useUserSlippageToleranceWithDefault } from 'state/user/hooks'
+import { useTheme } from 'styled-components'
 import { formatCurrencyAmount } from 'utils/formatCurrencyAmount'
 import { unwrappedToken } from 'utils/unwrappedToken'
 
 import { AutoColumn } from '../../components/Column'
-import CurrencyLogo from '../../components/CurrencyLogo'
 import FormattedCurrencyAmount from '../../components/FormattedCurrencyAmount'
+import CurrencyLogo from '../../components/Logo/CurrencyLogo'
 import { AutoRow, RowBetween, RowFixed } from '../../components/Row'
-import { V2_FACTORY_ADDRESSES } from '../../constants/addresses'
 import { WRAPPED_NATIVE_CURRENCY } from '../../constants/tokens'
 import { useToken } from '../../hooks/Tokens'
 import { usePairContract, useV2MigratorContract } from '../../hooks/useContract'
@@ -46,7 +47,7 @@ import useIsArgentWallet from '../../hooks/useIsArgentWallet'
 import { useTotalSupply } from '../../hooks/useTotalSupply'
 import { useTokenBalance } from '../../state/connection/hooks'
 import { TransactionType } from '../../state/transactions/types'
-import { BackArrow, ExternalLink, ThemedText } from '../../theme'
+import { BackArrowLink, ExternalLink, ThemedText } from '../../theme'
 import { isAddress } from '../../utils'
 import { calculateGasMargin } from '../../utils/calculateGasMargin'
 import { currencyId } from '../../utils/currencyId'
@@ -76,7 +77,7 @@ function LiquidityInfo({
   const currency1 = unwrappedToken(token1Amount.currency)
 
   return (
-    <AutoColumn gap="8px">
+    <AutoColumn gap="sm">
       <RowBetween>
         <RowFixed>
           <CurrencyLogo size="20px" style={{ marginRight: '8px' }} currency={currency0} />
@@ -263,6 +264,8 @@ function V2PairMigration({
   const addTransaction = useTransactionAdder()
   const isMigrationPending = useIsTransactionPending(pendingMigrationHash ?? undefined)
 
+  const networkSupportsV2 = useNetworkSupportsV2()
+
   const migrate = useCallback(() => {
     if (
       !migrator ||
@@ -273,7 +276,8 @@ function V2PairMigration({
       typeof tickUpper !== 'number' ||
       !v3Amount0Min ||
       !v3Amount1Min ||
-      !chainId
+      !chainId ||
+      !networkSupportsV2
     )
       return
 
@@ -355,30 +359,33 @@ function V2PairMigration({
         setConfirmingMigration(false)
       })
   }, [
-    chainId,
-    isNotUniswap,
     migrator,
-    noLiquidity,
-    blockTimestamp,
-    token0,
-    token1,
-    feeAmount,
-    pairBalance,
-    tickLower,
-    tickUpper,
-    sqrtPrice,
-    v3Amount0Min,
-    v3Amount1Min,
     account,
     deadline,
+    blockTimestamp,
+    tickLower,
+    tickUpper,
+    v3Amount0Min,
+    v3Amount1Min,
+    chainId,
+    networkSupportsV2,
     signatureData,
-    addTransaction,
-    pair,
+    noLiquidity,
+    pair.address,
+    pairBalance.quotient,
+    token0.address,
+    token1.address,
+    feeAmount,
+    sqrtPrice,
+    isNotUniswap,
     currency0,
     currency1,
+    addTransaction,
   ])
 
   const isSuccessfullyMigrated = !!pendingMigrationHash && JSBI.equal(pairBalance.quotient, ZERO)
+
+  if (!networkSupportsV2) return <V2Unsupported />
 
   return (
     <AutoColumn gap="20px">
@@ -435,7 +442,7 @@ function V2PairMigration({
           <FeeSelector feeAmount={feeAmount} handleFeePoolSelect={setFeeAmount} />
           {noLiquidity && (
             <BlueCard style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <AlertCircle color={theme.deprecated_text1} style={{ marginBottom: '12px', opacity: 0.8 }} />
+              <AlertCircle color={theme.textPrimary} style={{ marginBottom: '12px', opacity: 0.8 }} />
               <ThemedText.DeprecatedBody
                 fontSize={14}
                 style={{ marginBottom: 8, fontWeight: 500, opacity: 0.8 }}
@@ -457,7 +464,7 @@ function V2PairMigration({
               </ThemedText.DeprecatedBody>
 
               {v2SpotPrice && (
-                <AutoColumn gap="8px" style={{ marginTop: '12px' }}>
+                <AutoColumn gap="sm" style={{ marginTop: '12px' }}>
                   <RowBetween>
                     <ThemedText.DeprecatedBody fontWeight={500} fontSize={14}>
                       <Trans>
@@ -475,7 +482,7 @@ function V2PairMigration({
 
           {largePriceDifference ? (
             <YellowCard>
-              <AutoColumn gap="8px">
+              <AutoColumn gap="sm">
                 <RowBetween>
                   <ThemedText.DeprecatedBody fontSize={14}>
                     <Trans>
@@ -585,7 +592,7 @@ function V2PairMigration({
           ) : null}
 
           {position ? (
-            <DarkGreyCard>
+            <DarkGrayCard>
               <AutoColumn gap="md">
                 <LiquidityInfo token0Amount={position.amount0} token1Amount={position.amount1} />
                 {chainId && refund0 && refund1 ? (
@@ -600,12 +607,12 @@ function V2PairMigration({
                   </ThemedText.DeprecatedBlack>
                 ) : null}
               </AutoColumn>
-            </DarkGreyCard>
+            </DarkGrayCard>
           ) : null}
 
-          <AutoColumn gap="12px">
+          <AutoColumn gap="md">
             {!isSuccessfullyMigrated && !isMigrationPending ? (
-              <AutoColumn gap="12px" style={{ flex: '1' }}>
+              <AutoColumn gap="md" style={{ flex: '1' }}>
                 <ButtonConfirmed
                   confirmed={approval === ApprovalState.APPROVED || signatureData !== null}
                   disabled={
@@ -630,7 +637,7 @@ function V2PairMigration({
                 </ButtonConfirmed>
               </AutoColumn>
             ) : null}
-            <AutoColumn gap="12px" style={{ flex: '1' }}>
+            <AutoColumn gap="md" style={{ flex: '1' }}>
               <ButtonConfirmed
                 confirmed={isSuccessfullyMigrated}
                 disabled={
@@ -725,11 +732,11 @@ export default function MigrateV2Pair() {
     <BodyWrapper style={{ padding: 24 }}>
       <AutoColumn gap="16px">
         <AutoRow style={{ alignItems: 'center', justifyContent: 'space-between' }} gap="8px">
-          <BackArrow to="/migrate/v2" />
+          <BackArrowLink to="/migrate/v2" />
           <ThemedText.DeprecatedMediumHeader>
             <Trans>Migrate V2 Liquidity</Trans>
           </ThemedText.DeprecatedMediumHeader>
-          <SettingsTab placeholderSlippage={DEFAULT_MIGRATE_SLIPPAGE_TOLERANCE} />
+          <SettingsTab autoSlippage={DEFAULT_MIGRATE_SLIPPAGE_TOLERANCE} chainId={chainId} />
         </AutoRow>
 
         {!account ? (

@@ -1,9 +1,9 @@
 import { Connector } from '@web3-react/types'
 import { gnosisSafeConnection, networkConnection } from 'connection'
-import { getConnection } from 'connection/utils'
+import { getConnection } from 'connection'
 import { useEffect } from 'react'
-import { BACKFILLABLE_WALLETS } from 'state/connection/constants'
-import { useAppSelector } from 'state/hooks'
+import { useAppDispatch, useAppSelector } from 'state/hooks'
+import { updateSelectedWallet } from 'state/user/reducer'
 
 async function connect(connector: Connector) {
   try {
@@ -18,20 +18,28 @@ async function connect(connector: Connector) {
 }
 
 export default function useEagerlyConnect() {
-  const selectedWalletBackfilled = useAppSelector((state) => state.user.selectedWalletBackfilled)
+  const dispatch = useAppDispatch()
+
   const selectedWallet = useAppSelector((state) => state.user.selectedWallet)
+  const rehydrated = useAppSelector((state) => state._persist.rehydrated)
 
   useEffect(() => {
-    connect(gnosisSafeConnection.connector)
-    connect(networkConnection.connector)
+    try {
+      connect(gnosisSafeConnection.connector)
+      connect(networkConnection.connector)
 
-    if (selectedWallet) {
-      connect(getConnection(selectedWallet).connector)
-    } else if (!selectedWalletBackfilled) {
-      BACKFILLABLE_WALLETS.map(getConnection)
-        .map((connection) => connection.connector)
-        .forEach(connect)
+      if (!selectedWallet) return
+      const selectedConnection = getConnection(selectedWallet)
+
+      if (selectedConnection) {
+        connect(selectedConnection.connector)
+      }
+    } catch {
+      // only clear the persisted wallet type if it failed to connect.
+      if (rehydrated) {
+        dispatch(updateSelectedWallet({ wallet: undefined }))
+      }
+      return
     }
-    // The dependency list is empty so this is only run once on mount
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [dispatch, rehydrated, selectedWallet])
 }

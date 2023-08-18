@@ -5,7 +5,7 @@ import { AutoColumn } from 'components/Column'
 import { useFeeTierDistribution } from 'hooks/useFeeTierDistribution'
 import { PoolState } from 'hooks/usePools'
 import React from 'react'
-import styled from 'styled-components/macro'
+import styled from 'styled-components'
 import { ThemedText } from 'theme'
 
 import { FeeTierPercentageBadge } from './FeeTierPercentageBadge'
@@ -15,7 +15,7 @@ const ResponsiveText = styled(ThemedText.DeprecatedLabel)`
   line-height: 16px;
   font-size: 14px;
 
-  ${({ theme }) => theme.mediaWidth.upToSmall`
+  ${({ theme }) => theme.deprecated_mediaWidth.deprecated_upToSmall`
     font-size: 12px;
     line-height: 12px;
   `};

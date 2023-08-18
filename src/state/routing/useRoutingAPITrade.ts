@@ -2,16 +2,50 @@ import { skipToken } from '@reduxjs/toolkit/query/react'
 import { Currency, CurrencyAmount, TradeType } from '@uniswap/sdk-core'
 import { IMetric, MetricLoggerUnit, setGlobalMetric } from '@uniswap/smart-order-router'
 import { sendTiming } from 'components/analytics'
-import { useStablecoinAmountFromFiatValue } from 'hooks/useStablecoinPrice'
+import { AVERAGE_L1_BLOCK_TIME } from 'constants/chainInfo'
 import { useRoutingAPIArguments } from 'lib/hooks/routing/useRoutingAPIArguments'
-import useIsValidBlock from 'lib/hooks/useIsValidBlock'
-import ms from 'ms.macro'
+import ms from 'ms'
 import { useMemo } from 'react'
-import { useGetQuoteQuery } from 'state/routing/slice'
-import { useClientSideRouter } from 'state/user/hooks'
 
-import { GetQuoteResult, InterfaceTrade, TradeState } from './types'
-import { computeRoutes, transformRoutesToTrade } from './utils'
+import { useGetQuoteQuery } from './slice'
+import {
+  ClassicTrade,
+  InterfaceTrade,
+  INTERNAL_ROUTER_PREFERENCE_PRICE,
+  QuoteMethod,
+  QuoteState,
+  RouterPreference,
+  TradeState,
+} from './types'
+
+const TRADE_NOT_FOUND = { state: TradeState.NO_ROUTE_FOUND, trade: undefined } as const
+const TRADE_LOADING = { state: TradeState.LOADING, trade: undefined } as const
+
+export function useRoutingAPITrade<TTradeType extends TradeType>(
+  tradeType: TTradeType,
+  amountSpecified: CurrencyAmount<Currency> | undefined,
+  otherCurrency: Currency | undefined,
+  routerPreference: typeof INTERNAL_ROUTER_PREFERENCE_PRICE,
+  skipFetch?: boolean,
+  account?: string
+): {
+  state: TradeState
+  trade?: ClassicTrade
+  swapQuoteLatency?: number
+}
+
+export function useRoutingAPITrade<TTradeType extends TradeType>(
+  tradeType: TTradeType,
+  amountSpecified: CurrencyAmount<Currency> | undefined,
+  otherCurrency: Currency | undefined,
+  routerPreference: RouterPreference,
+  skipFetch?: boolean,
+  account?: string
+): {
+  state: TradeState
+  trade?: InterfaceTrade
+  swapQuoteLatency?: number
+}
 
 /**
  * Returns the best trade by invoking the routing api or the smart order router on the client
@@ -21,11 +55,16 @@ import { computeRoutes, transformRoutesToTrade } from './utils'
  */
 export function useRoutingAPITrade<TTradeType extends TradeType>(
   tradeType: TTradeType,
-  amountSpecified?: CurrencyAmount<Currency>,
-  otherCurrency?: Currency
+  amountSpecified: CurrencyAmount<Currency> | undefined,
+  otherCurrency: Currency | undefined,
+  routerPreference: RouterPreference | typeof INTERNAL_ROUTER_PREFERENCE_PRICE,
+  skipFetch = false,
+  account?: string
 ): {
   state: TradeState
-  trade: InterfaceTrade<Currency, Currency, TTradeType> | undefined
+  trade?: InterfaceTrade
+  method?: QuoteMethod
+  swapQuoteLatency?: number
 } {
   const [currencyIn, currencyOut]: [Currency | undefined, Currency | undefined] = useMemo(
     () =>
@@ -35,88 +74,60 @@ export function useRoutingAPITrade<TTradeType extends TradeType>(
     [amountSpecified, otherCurrency, tradeType]
   )
 
-  const [clientSideRouter] = useClientSideRouter()
-
   const queryArgs = useRoutingAPIArguments({
+    account,
     tokenIn: currencyIn,
     tokenOut: currencyOut,
-    amount: amountSpecified,
+    amount: skipFetch ? undefined : amountSpecified,
     tradeType,
-    useClientSideRouter: clientSideRouter,
+    routerPreference,
   })
 
-  const { isLoading, isError, data, currentData } = useGetQuoteQuery(queryArgs ?? skipToken, {
-    pollingInterval: ms`15s`,
-    refetchOnFocus: true,
+  const {
+    isError,
+    data: tradeResult,
+    error,
+    currentData: currentTradeResult,
+  } = useGetQuoteQuery(queryArgs ?? skipToken, {
+    // Price-fetching is informational and costly, so it's done less frequently.
+    pollingInterval: routerPreference === INTERNAL_ROUTER_PREFERENCE_PRICE ? ms(`1m`) : AVERAGE_L1_BLOCK_TIME,
+    // If latest quote from cache was fetched > 2m ago, instantly repoll for another instead of waiting for next poll period
+    refetchOnMountOrArgChange: 2 * 60,
   })
-
-  const quoteResult: GetQuoteResult | undefined = useIsValidBlock(Number(data?.blockNumber) || 0) ? data : undefined
-
-  const route = useMemo(
-    () => computeRoutes(currencyIn, currencyOut, tradeType, quoteResult),
-    [currencyIn, currencyOut, quoteResult, tradeType]
-  )
-
-  // get USD gas cost of trade in active chains stablecoin amount
-  const gasUseEstimateUSD = useStablecoinAmountFromFiatValue(quoteResult?.gasUseEstimateUSD) ?? null
-
-  const isSyncing = currentData !== data
+  const isCurrent = currentTradeResult === tradeResult
 
   return useMemo(() => {
-    if (!currencyIn || !currencyOut) {
+    if (skipFetch && amountSpecified) {
+      // If we don't want to fetch new trades, but have valid inputs, return the stale trade.
+      return { state: TradeState.STALE, trade: tradeResult?.trade, swapQuoteLatency: tradeResult?.latencyMs }
+    } else if (!amountSpecified || isError || !queryArgs) {
       return {
         state: TradeState.INVALID,
         trade: undefined,
+        error: JSON.stringify(error),
       }
-    }
-
-    if (isLoading && !quoteResult) {
-      // only on first hook render
+    } else if (tradeResult?.state === QuoteState.NOT_FOUND && isCurrent) {
+      return TRADE_NOT_FOUND
+    } else if (!tradeResult?.trade) {
+      // TODO(WEB-1985): use `isLoading` returned by rtk-query hook instead of checking for `trade` status
+      return TRADE_LOADING
+    } else {
       return {
-        state: TradeState.LOADING,
-        trade: undefined,
+        state: isCurrent ? TradeState.VALID : TradeState.LOADING,
+        trade: tradeResult.trade,
+        swapQuoteLatency: tradeResult.latencyMs,
       }
-    }
-
-    let otherAmount = undefined
-    if (quoteResult) {
-      if (tradeType === TradeType.EXACT_INPUT && currencyOut) {
-        otherAmount = CurrencyAmount.fromRawAmount(currencyOut, quoteResult.quote)
-      }
-
-      if (tradeType === TradeType.EXACT_OUTPUT && currencyIn) {
-        otherAmount = CurrencyAmount.fromRawAmount(currencyIn, quoteResult.quote)
-      }
-    }
-
-    if (isError || !otherAmount || !route || route.length === 0 || !queryArgs) {
-      return {
-        state: TradeState.NO_ROUTE_FOUND,
-        trade: undefined,
-      }
-    }
-
-    try {
-      const trade = transformRoutesToTrade(route, tradeType, gasUseEstimateUSD)
-      return {
-        // always return VALID regardless of isFetching status
-        state: isSyncing ? TradeState.SYNCING : TradeState.VALID,
-        trade,
-      }
-    } catch (e) {
-      return { state: TradeState.INVALID, trade: undefined }
     }
   }, [
-    currencyIn,
-    currencyOut,
-    quoteResult,
-    isLoading,
-    tradeType,
+    amountSpecified,
+    error,
+    isCurrent,
     isError,
-    route,
     queryArgs,
-    gasUseEstimateUSD,
-    isSyncing,
+    skipFetch,
+    tradeResult?.state,
+    tradeResult?.latencyMs,
+    tradeResult?.trade,
   ])
 }
 
@@ -128,6 +139,10 @@ class GAMetric extends IMetric {
 
   putMetric(key: string, value: number, unit?: MetricLoggerUnit) {
     sendTiming('Routing API', `${key} | ${unit}`, value, 'client')
+  }
+
+  setProperty() {
+    return
   }
 }
 
