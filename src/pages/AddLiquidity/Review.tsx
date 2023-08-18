@@ -2,7 +2,7 @@ import { Currency, CurrencyAmount, Price } from '@uniswap/sdk-core'
 import { Position } from '@uniswap/v3-sdk'
 import { AutoColumn } from 'components/Column'
 import { PositionPreview } from 'components/PositionPreview'
-import styled from 'styled-components/macro'
+import styled from 'styled-components'
 
 import { Bound, Field } from '../../state/mint/v3/actions'
 
@@ -31,7 +31,7 @@ export function Review({
             position={position}
             inRange={!outOfRange}
             ticksAtLimit={ticksAtLimit}
-            title={'Selected Range'}
+            title="Selected Range"
           />
         ) : null}
       </AutoColumn>

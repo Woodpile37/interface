@@ -1,8 +1,10 @@
 import { Trans } from '@lingui/macro'
+import { InterfacePageName } from '@uniswap/analytics-events'
 import { Currency, CurrencyAmount, Token } from '@uniswap/sdk-core'
 import { useWeb3React } from '@web3-react/core'
-import { PageName } from 'components/AmplitudeAnalytics/constants'
-import { Trace } from 'components/AmplitudeAnalytics/Trace'
+import { Trace } from 'analytics'
+import { V2Unsupported } from 'components/V2Unsupported'
+import { useNetworkSupportsV2 } from 'hooks/useNetworkSupportsV2'
 import JSBI from 'jsbi'
 import { useCallback, useEffect, useState } from 'react'
 import { Plus } from 'react-feather'
@@ -13,7 +15,7 @@ import { ButtonDropdownLight } from '../../components/Button'
 import { LightCard } from '../../components/Card'
 import { BlueCard } from '../../components/Card'
 import { AutoColumn, ColumnCenter } from '../../components/Column'
-import CurrencyLogo from '../../components/CurrencyLogo'
+import CurrencyLogo from '../../components/Logo/CurrencyLogo'
 import { FindPoolTabs } from '../../components/NavigationTabs'
 import { MinimalPositionCard } from '../../components/PositionCard'
 import Row from '../../components/Row'
@@ -27,7 +29,7 @@ import { StyledInternalLink } from '../../theme'
 import { ThemedText } from '../../theme'
 import { currencyId } from '../../utils/currencyId'
 import AppBody from '../AppBody'
-import { Dots } from '../Pool/styleds'
+import { Dots } from '../Pool/styled'
 
 enum Fields {
   TOKEN0 = 0,
@@ -96,15 +98,18 @@ export default function PoolFinder() {
     </LightCard>
   )
 
+  const networkSupportsV2 = useNetworkSupportsV2()
+  if (!networkSupportsV2) return <V2Unsupported />
+
   return (
-    <Trace page={PageName.POOL_PAGE} shouldLogImpression>
+    <Trace page={InterfacePageName.POOL_PAGE} shouldLogImpression>
       <>
         <AppBody>
-          <FindPoolTabs origin={query.get('origin') ?? '/pool/v2'} />
+          <FindPoolTabs origin={query.get('origin') ?? '/pools'} />
           <AutoColumn style={{ padding: '1rem' }} gap="md">
             <BlueCard>
               <AutoColumn gap="10px">
-                <ThemedText.DeprecatedLink fontWeight={400} color={'deprecated_primaryText1'}>
+                <ThemedText.DeprecatedLink fontWeight={400} color="accentAction">
                   <Trans>
                     <b>Tip:</b> Use this tool to find v2 pools that don&apos;t automatically appear in the interface.
                   </Trans>
@@ -120,12 +125,12 @@ export default function PoolFinder() {
               {currency0 ? (
                 <Row>
                   <CurrencyLogo currency={currency0} />
-                  <Text fontWeight={500} fontSize={20} marginLeft={'12px'}>
+                  <Text fontWeight={500} fontSize={20} marginLeft="12px">
                     {currency0.symbol}
                   </Text>
                 </Row>
               ) : (
-                <Text fontWeight={500} fontSize={20} marginLeft={'12px'}>
+                <Text fontWeight={500} fontSize={20} marginLeft="12px">
                   <Trans>Select a token</Trans>
                 </Text>
               )}
@@ -144,12 +149,12 @@ export default function PoolFinder() {
               {currency1 ? (
                 <Row>
                   <CurrencyLogo currency={currency1} />
-                  <Text fontWeight={500} fontSize={20} marginLeft={'12px'}>
+                  <Text fontWeight={500} fontSize={20} marginLeft="12px">
                     {currency1.symbol}
                   </Text>
                 </Row>
               ) : (
-                <Text fontWeight={500} fontSize={20} marginLeft={'12px'}>
+                <Text fontWeight={500} fontSize={20} marginLeft="12px">
                   <Trans>Select a token</Trans>
                 </Text>
               )}
@@ -162,7 +167,7 @@ export default function PoolFinder() {
                 <Text textAlign="center" fontWeight={500}>
                   <Trans>Pool Found!</Trans>
                 </Text>
-                <StyledInternalLink to={`/pool/v2`}>
+                <StyledInternalLink to="pools/v2">
                   <Text textAlign="center">
                     <Trans>Manage this pool.</Trans>
                   </Text>

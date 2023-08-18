@@ -35,9 +35,18 @@ export enum TransactionType {
   SUBMIT_PROPOSAL,
   QUEUE,
   EXECUTE,
+  BUY,
+  SEND,
+  RECEIVE,
+  MINT,
+  BURN,
+  BORROW,
+  REPAY,
+  DEPLOY,
+  CANCEL,
 }
 
-export interface BaseTransactionInfo {
+interface BaseTransactionInfo {
   type: TransactionType
 }
 
@@ -70,6 +79,7 @@ export interface ApproveTransactionInfo extends BaseTransactionInfo {
   type: TransactionType.APPROVAL
   tokenAddress: string
   spender: string
+  amount: string
 }
 
 interface BaseSwapTransactionInfo extends BaseTransactionInfo {
@@ -77,6 +87,7 @@ interface BaseSwapTransactionInfo extends BaseTransactionInfo {
   tradeType: TradeType
   inputCurrencyId: string
   outputCurrencyId: string
+  isUniswapXOrder: boolean
 }
 
 export interface ExactInputSwapTransactionInfo extends BaseSwapTransactionInfo {
@@ -84,6 +95,7 @@ export interface ExactInputSwapTransactionInfo extends BaseSwapTransactionInfo {
   inputCurrencyAmountRaw: string
   expectedOutputCurrencyAmountRaw: string
   minimumOutputCurrencyAmountRaw: string
+  settledOutputCurrencyAmountRaw?: string
 }
 export interface ExactOutputSwapTransactionInfo extends BaseSwapTransactionInfo {
   tradeType: TradeType.EXACT_OUTPUT
@@ -92,13 +104,13 @@ export interface ExactOutputSwapTransactionInfo extends BaseSwapTransactionInfo 
   maximumInputCurrencyAmountRaw: string
 }
 
-export interface DepositLiquidityStakingTransactionInfo {
+interface DepositLiquidityStakingTransactionInfo {
   type: TransactionType.DEPOSIT_LIQUIDITY_STAKING
   token0Address: string
   token1Address: string
 }
 
-export interface WithdrawLiquidityStakingTransactionInfo {
+interface WithdrawLiquidityStakingTransactionInfo {
   type: TransactionType.WITHDRAW_LIQUIDITY_STAKING
   token0Address: string
   token1Address: string
@@ -152,6 +164,8 @@ export interface CollectFeesTransactionInfo {
   type: TransactionType.COLLECT_FEES
   currencyId0: string
   currencyId1: string
+  expectedCurrencyOwed0: string
+  expectedCurrencyOwed1: string
 }
 
 export interface RemoveLiquidityV3TransactionInfo {
@@ -162,7 +176,7 @@ export interface RemoveLiquidityV3TransactionInfo {
   expectedAmountQuoteRaw: string
 }
 
-export interface SubmitProposalTransactionInfo {
+interface SubmitProposalTransactionInfo {
   type: TransactionType.SUBMIT_PROPOSAL
 }
 
@@ -192,6 +206,9 @@ export interface TransactionDetails {
   lastCheckedBlockNumber?: number
   addedTime: number
   confirmedTime?: number
+  deadline?: number
   from: string
   info: TransactionInfo
+  nonce?: number
+  cancelled?: boolean
 }

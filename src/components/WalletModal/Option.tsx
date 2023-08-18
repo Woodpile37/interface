@@ -1,157 +1,116 @@
-import { ElementName, Event, EventName } from 'components/AmplitudeAnalytics/constants'
-import { TraceEvent } from 'components/AmplitudeAnalytics/TraceEvent'
-import React from 'react'
-import styled from 'styled-components/macro'
-
-import { ExternalLink } from '../../theme'
-
-const InfoCard = styled.button<{ isActive?: boolean }>`
-  background-color: ${({ theme, isActive }) => (isActive ? theme.deprecated_bg3 : theme.deprecated_bg2)};
-  padding: 1rem;
-  outline: none;
-  border: 1px solid;
-  border-radius: 12px;
-  width: 100% !important;
-  &:focus {
-    box-shadow: 0 0 0 1px ${({ theme }) => theme.deprecated_primary1};
-  }
-  border-color: ${({ theme, isActive }) => (isActive ? 'transparent' : theme.deprecated_bg3)};
-`
-
-const OptionCard = styled(InfoCard as any)`
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 2rem;
-  padding: 1rem;
-`
+import { BrowserEvent, InterfaceElementName, InterfaceEventName } from '@uniswap/analytics-events'
+import { useWeb3React } from '@web3-react/core'
+import { TraceEvent } from 'analytics'
+import { useToggleAccountDrawer } from 'components/AccountDrawer'
+import Loader from 'components/Icons/LoadingSpinner'
+import { ActivationStatus, useActivationState } from 'connection/activate'
+import { Connection } from 'connection/types'
+import styled from 'styled-components'
+import { useIsDarkMode } from 'theme/components/ThemeToggle'
+import { flexColumnNoWrap, flexRowNoWrap } from 'theme/styles'
 
 const OptionCardLeft = styled.div`
-  ${({ theme }) => theme.flexColumnNoWrap};
-  justify-content: center;
-  height: 100%;
-`
-
-const OptionCardClickable = styled(OptionCard as any)<{ clickable?: boolean }>`
-  margin-top: 0;
-  &:hover {
-    cursor: ${({ clickable }) => (clickable ? 'pointer' : '')};
-    border: ${({ clickable, theme }) => (clickable ? `1px solid ${theme.deprecated_primary1}` : ``)};
-  }
-  opacity: ${({ disabled }) => (disabled ? '0.5' : '1')};
-`
-
-const GreenCircle = styled.div`
-  ${({ theme }) => theme.flexRowNoWrap}
-  justify-content: center;
+  ${flexColumnNoWrap};
+  flex-direction: row;
   align-items: center;
-
-  &:first-child {
-    height: 8px;
-    width: 8px;
-    margin-right: 8px;
-    background-color: ${({ theme }) => theme.deprecated_green1};
-    border-radius: 50%;
-  }
 `
 
-const CircleWrapper = styled.div`
-  color: ${({ theme }) => theme.deprecated_green1};
+const OptionCardClickable = styled.button<{ selected: boolean }>`
+  align-items: center;
+  background-color: unset;
+  border: none;
+  cursor: pointer;
   display: flex;
-  justify-content: center;
-  align-items: center;
+  flex: 1 1 auto;
+  flex-direction: row;
+  justify-content: space-between;
+  opacity: ${({ disabled, selected }) => (disabled && !selected ? '0.5' : '1')};
+  padding: 18px;
+  transition: ${({ theme }) => theme.transition.duration.fast};
 `
 
 const HeaderText = styled.div`
-  ${({ theme }) => theme.flexRowNoWrap};
-  color: ${(props) =>
-    props.color === 'blue' ? ({ theme }) => theme.deprecated_primary1 : ({ theme }) => theme.deprecated_text1};
-  font-size: 1rem;
-  font-weight: 500;
-`
-
-const SubHeader = styled.div`
-  color: ${({ theme }) => theme.deprecated_text1};
-  margin-top: 10px;
-  font-size: 12px;
-`
-
-const IconWrapper = styled.div<{ size?: number | null }>`
-  ${({ theme }) => theme.flexColumnNoWrap};
+  ${flexRowNoWrap};
   align-items: center;
   justify-content: center;
+  color: ${(props) => (props.color === 'blue' ? ({ theme }) => theme.accentAction : ({ theme }) => theme.textPrimary)};
+  font-size: 16px;
+  font-weight: 600;
+  padding: 0 8px;
+`
+const IconWrapper = styled.div`
+  ${flexColumnNoWrap};
+  align-items: center;
+  justify-content: center;
+  img {
+    ${({ theme }) => !theme.darkMode && `border: 1px solid ${theme.backgroundOutline}`};
+    border-radius: 12px;
+  }
   & > img,
   span {
-    height: ${({ size }) => (size ? size + 'px' : '24px')};
-    width: ${({ size }) => (size ? size + 'px' : '24px')};
+    height: 40px;
+    width: 40px;
   }
-  ${({ theme }) => theme.mediaWidth.upToMedium`
+  ${({ theme }) => theme.deprecated_mediaWidth.deprecated_upToMedium`
     align-items: flex-end;
   `};
 `
 
-export default function Option({
-  link = null,
-  clickable = true,
-  size,
-  onClick = null,
-  color,
-  header,
-  subheader,
-  icon,
-  isActive = false,
-  id,
-}: {
-  link?: string | null
-  clickable?: boolean
-  size?: number | null
-  onClick?: null | (() => void)
-  color: string
-  header: React.ReactNode
-  subheader?: React.ReactNode
-  icon: string
-  isActive?: boolean
-  id: string
-}) {
-  const content = (
-    <TraceEvent
-      events={[Event.onClick]}
-      name={EventName.WALLET_SELECTED}
-      properties={{ wallet_type: header }}
-      element={ElementName.WALLET_TYPE_OPTION}
-    >
-      <OptionCardClickable
-        id={id}
-        onClick={onClick}
-        clickable={clickable && !isActive}
-        active={isActive}
-        data-testid="wallet-modal-option"
-      >
-        <OptionCardLeft>
-          <HeaderText color={color}>
-            {isActive ? (
-              <CircleWrapper>
-                <GreenCircle>
-                  <div />
-                </GreenCircle>
-              </CircleWrapper>
-            ) : (
-              ''
-            )}
-            {header}
-          </HeaderText>
-          {subheader && <SubHeader>{subheader}</SubHeader>}
-        </OptionCardLeft>
-        <IconWrapper size={size}>
-          <img src={icon} alt={'Icon'} />
-        </IconWrapper>
-      </OptionCardClickable>
-    </TraceEvent>
-  )
-  if (link) {
-    return <ExternalLink href={link}>{content}</ExternalLink>
-  }
+const Wrapper = styled.div<{ disabled: boolean }>`
+  align-items: stretch;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  position: relative;
+  width: 100%;
 
-  return content
+  background-color: ${({ theme }) => theme.backgroundModule};
+
+  &:hover {
+    cursor: ${({ disabled }) => !disabled && 'pointer'};
+    background-color: ${({ theme, disabled }) => !disabled && theme.hoverState};
+  }
+  &:focus {
+    background-color: ${({ theme, disabled }) => !disabled && theme.hoverState};
+  }
+`
+
+interface OptionProps {
+  connection: Connection
+}
+export default function Option({ connection }: OptionProps) {
+  const { activationState, tryActivation } = useActivationState()
+  const toggleAccountDrawer = useToggleAccountDrawer()
+  const { chainId } = useWeb3React()
+  const activate = () => tryActivation(connection, toggleAccountDrawer, chainId)
+
+  const isSomeOptionPending = activationState.status === ActivationStatus.PENDING
+  const isCurrentOptionPending = isSomeOptionPending && activationState.connection.type === connection.type
+  const isDarkMode = useIsDarkMode()
+
+  return (
+    <Wrapper disabled={isSomeOptionPending}>
+      <TraceEvent
+        events={[BrowserEvent.onClick]}
+        name={InterfaceEventName.WALLET_SELECTED}
+        properties={{ wallet_type: connection.getName() }}
+        element={InterfaceElementName.WALLET_TYPE_OPTION}
+      >
+        <OptionCardClickable
+          disabled={isSomeOptionPending}
+          onClick={activate}
+          selected={isCurrentOptionPending}
+          data-testid={`wallet-option-${connection.type}`}
+        >
+          <OptionCardLeft>
+            <IconWrapper>
+              <img src={connection.getIcon?.(isDarkMode)} alt={connection.getName()} />
+            </IconWrapper>
+            <HeaderText>{connection.getName()}</HeaderText>
+          </OptionCardLeft>
+          {isCurrentOptionPending && <Loader />}
+        </OptionCardClickable>
+      </TraceEvent>
+    </Wrapper>
+  )
 }

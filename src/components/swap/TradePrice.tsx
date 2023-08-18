@@ -1,15 +1,14 @@
 import { Trans } from '@lingui/macro'
 import { Currency, Price } from '@uniswap/sdk-core'
-import useStablecoinPrice from 'hooks/useStablecoinPrice'
-import { useCallback, useContext } from 'react'
-import { Text } from 'rebass'
-import styled, { ThemeContext } from 'styled-components/macro'
+import { useUSDPrice } from 'hooks/useUSDPrice'
+import tryParseCurrencyAmount from 'lib/utils/tryParseCurrencyAmount'
+import { useCallback, useMemo, useState } from 'react'
+import styled from 'styled-components'
 import { ThemedText } from 'theme'
+import { formatNumber, formatPrice, NumberType } from 'utils/formatNumbers'
 
 interface TradePriceProps {
   price: Price<Currency, Currency>
-  showInverted: boolean
-  setShowInverted: (showInverted: boolean) => void
 }
 
 const StyledPriceContainer = styled.button`
@@ -25,26 +24,22 @@ const StyledPriceContainer = styled.button`
   flex-direction: row;
   text-align: left;
   flex-wrap: wrap;
-  padding: 8px 0;
   user-select: text;
 `
 
-export default function TradePrice({ price, showInverted, setShowInverted }: TradePriceProps) {
-  const theme = useContext(ThemeContext)
+export default function TradePrice({ price }: TradePriceProps) {
+  const [showInverted, setShowInverted] = useState<boolean>(false)
 
-  const usdcPrice = useStablecoinPrice(showInverted ? price.baseCurrency : price.quoteCurrency)
-  /*
-   * calculate needed amount of decimal prices, for prices between 0.95-1.05 use 4 decimal places
-   */
-  const p = Number(usdcPrice?.toFixed())
-  const visibleDecimalPlaces = p < 1.05 ? 4 : 2
+  const { baseCurrency, quoteCurrency } = price
+  const { data: usdPrice } = useUSDPrice(tryParseCurrencyAmount('1', showInverted ? baseCurrency : quoteCurrency))
 
-  let formattedPrice: string
-  try {
-    formattedPrice = showInverted ? price.toSignificant(4) : price.invert()?.toSignificant(4)
-  } catch (error) {
-    formattedPrice = '0'
-  }
+  const formattedPrice = useMemo(() => {
+    try {
+      return formatPrice(showInverted ? price : price.invert(), NumberType.TokenTx)
+    } catch {
+      return '0'
+    }
+  }, [price, showInverted])
 
   const label = showInverted ? `${price.quoteCurrency?.symbol}` : `${price.baseCurrency?.symbol} `
   const labelInverted = showInverted ? `${price.baseCurrency?.symbol} ` : `${price.quoteCurrency?.symbol}`
@@ -60,13 +55,11 @@ export default function TradePrice({ price, showInverted, setShowInverted }: Tra
       }}
       title={text}
     >
-      <Text fontWeight={500} color={theme.deprecated_text1}>
-        {text}
-      </Text>{' '}
-      {usdcPrice && (
-        <ThemedText.DeprecatedDarkGray>
-          <Trans>(${usdcPrice.toFixed(visibleDecimalPlaces, { groupSeparator: ',' })})</Trans>
-        </ThemedText.DeprecatedDarkGray>
+      <ThemedText.BodySmall>{text}</ThemedText.BodySmall>{' '}
+      {usdPrice && (
+        <ThemedText.BodySmall color="textSecondary">
+          <Trans>({formatNumber(usdPrice, NumberType.FiatTokenPrice)})</Trans>
+        </ThemedText.BodySmall>
       )}
     </StyledPriceContainer>
   )

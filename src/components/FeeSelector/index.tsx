@@ -13,7 +13,7 @@ import usePrevious from 'hooks/usePrevious'
 import { DynamicSection } from 'pages/AddLiquidity/styled'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Box } from 'rebass'
-import styled, { keyframes } from 'styled-components/macro'
+import styled, { keyframes } from 'styled-components'
 import { ThemedText } from 'theme'
 
 import { FeeOption } from './FeeOption'
@@ -34,8 +34,8 @@ const pulse = (color: string) => keyframes`
   }
 `
 const FocusedOutlineCard = styled(Card)<{ pulsing: boolean }>`
-  border: 1px solid ${({ theme }) => theme.deprecated_bg2};
-  animation: ${({ pulsing, theme }) => pulsing && pulse(theme.deprecated_primary1)} 0.6s linear;
+  border: 1px solid ${({ theme }) => theme.backgroundInteractive};
+  animation: ${({ pulsing, theme }) => pulsing && pulse(theme.accentAction)} 0.6s linear;
   align-self: center;
 `
 
@@ -56,8 +56,8 @@ export default function FeeSelector({
   disabled?: boolean
   feeAmount?: FeeAmount
   handleFeePoolSelect: (feeAmount: FeeAmount) => void
-  currencyA?: Currency | undefined
-  currencyB?: Currency | undefined
+  currencyA?: Currency
+  currencyB?: Currency
 }) {
   const { chainId } = useWeb3React()
 

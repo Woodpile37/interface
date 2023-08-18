@@ -1,51 +1,9 @@
-import { useCallback, useContext, useEffect } from 'react'
-import { X } from 'react-feather'
-import { animated } from 'react-spring'
-import { useSpring } from 'react-spring/web'
-import styled, { ThemeContext } from 'styled-components/macro'
+import { useWeb3React } from '@web3-react/core'
+import { useEffect } from 'react'
 
 import { useRemovePopup } from '../../state/application/hooks'
-import { PopupContent } from '../../state/application/reducer'
-import FailedNetworkSwitchPopup from './FailedNetworkSwitchPopup'
-import TransactionPopup from './TransactionPopup'
-
-const StyledClose = styled(X)`
-  position: absolute;
-  right: 10px;
-  top: 10px;
-
-  :hover {
-    cursor: pointer;
-  }
-`
-const Popup = styled.div`
-  display: inline-block;
-  width: 100%;
-  padding: 1em;
-  background-color: ${({ theme }) => theme.deprecated_bg0};
-  position: relative;
-  border-radius: 10px;
-  padding: 20px;
-  padding-right: 35px;
-  overflow: hidden;
-
-  ${({ theme }) => theme.mediaWidth.upToSmall`
-    min-width: 290px;
-    &:not(:last-of-type) {
-      margin-right: 20px;
-    }
-  `}
-`
-const Fader = styled.div`
-  position: absolute;
-  bottom: 0px;
-  left: 0px;
-  width: 100%;
-  height: 2px;
-  background-color: ${({ theme }) => theme.deprecated_bg3};
-`
-
-const AnimatedFader = animated(Fader)
+import { PopupContent, PopupType } from '../../state/application/reducer'
+import { FailedNetworkSwitchPopup, TransactionPopupContent, UniswapXOrderPopupContent } from './PopupContent'
 
 export default function PopupItem({
   removeAfterMs,
@@ -57,42 +15,31 @@ export default function PopupItem({
   popKey: string
 }) {
   const removePopup = useRemovePopup()
-  const removeThisPopup = useCallback(() => removePopup(popKey), [popKey, removePopup])
+  const onClose = () => removePopup(popKey)
+
   useEffect(() => {
     if (removeAfterMs === null) return undefined
 
     const timeout = setTimeout(() => {
-      removeThisPopup()
+      removePopup(popKey)
     }, removeAfterMs)
 
     return () => {
       clearTimeout(timeout)
     }
-  }, [removeAfterMs, removeThisPopup])
+  }, [popKey, removeAfterMs, removePopup])
 
-  const theme = useContext(ThemeContext)
+  const { chainId } = useWeb3React()
 
-  let popupContent
-  if ('txn' in content) {
-    const {
-      txn: { hash },
-    } = content
-    popupContent = <TransactionPopup hash={hash} />
-  } else if ('failedSwitchNetwork' in content) {
-    popupContent = <FailedNetworkSwitchPopup chainId={content.failedSwitchNetwork} />
+  switch (content.type) {
+    case PopupType.Transaction: {
+      return chainId ? <TransactionPopupContent hash={content.hash} chainId={chainId} onClose={onClose} /> : null
+    }
+    case PopupType.Order: {
+      return <UniswapXOrderPopupContent orderHash={content.orderHash} onClose={onClose} />
+    }
+    case PopupType.FailedSwitchNetwork: {
+      return <FailedNetworkSwitchPopup chainId={content.failedSwitchNetwork} onClose={onClose} />
+    }
   }
-
-  const faderStyle = useSpring({
-    from: { width: '100%' },
-    to: { width: '0%' },
-    config: { duration: removeAfterMs ?? undefined },
-  })
-
-  return (
-    <Popup>
-      <StyledClose color={theme.deprecated_text2} onClick={removeThisPopup} />
-      {popupContent}
-      {removeAfterMs !== null ? <AnimatedFader style={faderStyle} /> : null}
-    </Popup>
-  )
 }

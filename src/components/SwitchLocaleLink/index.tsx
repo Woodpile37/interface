@@ -1,14 +1,14 @@
 import { Trans } from '@lingui/macro'
 import { useLocationLinkProps } from 'hooks/useLocationLinkProps'
 import { useMemo } from 'react'
-import styled from 'styled-components/macro'
+import styled from 'styled-components'
 
 import { DEFAULT_LOCALE, LOCALE_LABEL, SupportedLocale } from '../../constants/locales'
 import { navigatorLocale, useActiveLocale } from '../../hooks/useActiveLocale'
 import { StyledInternalLink, ThemedText } from '../../theme'
 
 const Container = styled(ThemedText.DeprecatedSmall)`
-  opacity: 0.6;
+  opacity: ${({ theme }) => theme.opacity.hover};
   :hover {
     opacity: 1;
   }

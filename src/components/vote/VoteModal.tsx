@@ -1,8 +1,8 @@
 import { Trans } from '@lingui/macro'
 import { useWeb3React } from '@web3-react/core'
-import { useContext, useState } from 'react'
+import { useState } from 'react'
 import { ArrowUpCircle, X } from 'react-feather'
-import styled, { ThemeContext } from 'styled-components/macro'
+import styled, { useTheme } from 'styled-components'
 import { formatCurrencyAmount } from 'utils/formatCurrencyAmount'
 
 import Circle from '../../assets/images/blue-loader.svg'
@@ -39,8 +39,8 @@ const ConfirmedIcon = styled(ColumnCenter)`
 interface VoteModalProps {
   isOpen: boolean
   onDismiss: () => void
-  voteOption: VoteOption | undefined
-  proposalId: string | undefined // id for the proposal to vote on
+  voteOption?: VoteOption
+  proposalId?: string // id for the proposal to vote on
 }
 
 export default function VoteModal({ isOpen, onDismiss, proposalId, voteOption }: VoteModalProps) {
@@ -53,7 +53,7 @@ export default function VoteModal({ isOpen, onDismiss, proposalId, voteOption }:
   const [attempting, setAttempting] = useState<boolean>(false)
 
   // get theme for colors
-  const theme = useContext(ThemeContext)
+  const theme = useTheme()
 
   // wrapper to reset state on modal close
   function wrappedOnDismiss() {
@@ -120,10 +120,10 @@ export default function VoteModal({ isOpen, onDismiss, proposalId, voteOption }:
             <StyledClosed onClick={wrappedOnDismiss} />
           </RowBetween>
           <ConfirmedIcon>
-            <CustomLightSpinner src={Circle} alt="loader" size={'90px'} />
+            <CustomLightSpinner src={Circle} alt="loader" size="90px" />
           </ConfirmedIcon>
-          <AutoColumn gap="100px" justify={'center'}>
-            <AutoColumn gap="12px" justify={'center'}>
+          <AutoColumn gap="100px" justify="center">
+            <AutoColumn gap="md" justify="center">
               <ThemedText.DeprecatedLargeHeader>
                 <Trans>Submitting Vote</Trans>
               </ThemedText.DeprecatedLargeHeader>
@@ -141,10 +141,10 @@ export default function VoteModal({ isOpen, onDismiss, proposalId, voteOption }:
             <StyledClosed onClick={wrappedOnDismiss} />
           </RowBetween>
           <ConfirmedIcon>
-            <ArrowUpCircle strokeWidth={0.5} size={90} color={theme.deprecated_primary1} />
+            <ArrowUpCircle strokeWidth={0.5} size={90} color={theme.accentAction} />
           </ConfirmedIcon>
-          <AutoColumn gap="100px" justify={'center'}>
-            <AutoColumn gap="12px" justify={'center'}>
+          <AutoColumn gap="100px" justify="center">
+            <AutoColumn gap="md" justify="center">
               <ThemedText.DeprecatedLargeHeader>
                 <Trans>Transaction Submitted</Trans>
               </ThemedText.DeprecatedLargeHeader>

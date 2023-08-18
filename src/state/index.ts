@@ -1,55 +1,41 @@
 import { configureStore } from '@reduxjs/toolkit'
 import { setupListeners } from '@reduxjs/toolkit/query/react'
-import multicall from 'lib/state/multicall'
-import { load, save } from 'redux-localstorage-simple'
+import { persistStore } from 'redux-persist'
 
-import application from './application/reducer'
-import burn from './burn/reducer'
-import burnV3 from './burn/v3/reducer'
-import connection from './connection/reducer'
-import { api as dataApi } from './data/slice'
 import { updateVersion } from './global/actions'
-import lists from './lists/reducer'
-import logs from './logs/slice'
-import mint from './mint/reducer'
-import mintV3 from './mint/v3/reducer'
+import { sentryEnhancer } from './logging'
+import reducer from './reducer'
 import { routingApi } from './routing/slice'
-import swap from './swap/reducer'
-import transactions from './transactions/reducer'
-import user from './user/reducer'
 
-const PERSISTED_KEYS: string[] = ['user', 'transactions', 'lists']
+export function createDefaultStore() {
+  return configureStore({
+    reducer,
+    enhancers: (defaultEnhancers) => defaultEnhancers.concat(sentryEnhancer),
+    middleware: (getDefaultMiddleware) =>
+      getDefaultMiddleware({
+        thunk: true,
+        serializableCheck: {
+          // meta.arg and meta.baseQueryMeta are defaults. payload.trade is a nonserializable return value, but that's ok
+          // because we are not adding it into any persisted store that requires serialization (e.g. localStorage)
+          ignoredActionPaths: ['meta.arg', 'meta.baseQueryMeta', 'payload.trade'],
+          ignoredPaths: [routingApi.reducerPath],
+          ignoredActions: [
+            // ignore the redux-persist actions
+            'persist/PERSIST',
+            'persist/REHYDRATE',
+            'persist/PURGE',
+            'persist/FLUSH',
+          ],
+        },
+      }).concat(routingApi.middleware),
+  })
+}
 
-const store = configureStore({
-  reducer: {
-    application,
-    user,
-    connection,
-    transactions,
-    swap,
-    mint,
-    mintV3,
-    burn,
-    burnV3,
-    multicall: multicall.reducer,
-    lists,
-    logs,
-    [dataApi.reducerPath]: dataApi.reducer,
-    [routingApi.reducerPath]: routingApi.reducer,
-  },
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware({ thunk: true })
-      .concat(dataApi.middleware)
-      .concat(routingApi.middleware)
-      .concat(save({ states: PERSISTED_KEYS, debounce: 1000 })),
-  preloadedState: load({ states: PERSISTED_KEYS, disableWarnings: process.env.NODE_ENV === 'test' }),
-})
-
-store.dispatch(updateVersion())
+const store = createDefaultStore()
+export const persistor = persistStore(store)
 
 setupListeners(store.dispatch)
 
-export default store
+store.dispatch(updateVersion())
 
-export type AppState = ReturnType<typeof store.getState>
-export type AppDispatch = typeof store.dispatch
+export default store
